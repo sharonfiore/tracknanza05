@@ -288,20 +288,20 @@ body.hide .amt{filter:blur(9px);user-select:none;transition:filter .2s}
 .lock-logo{width:68px;height:68px;border-radius:24px;margin:0 auto 14px;display:grid;place-items:center;font-size:2rem;
   background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(12px);box-shadow:0 20px 40px -16px rgba(0,0,0,.5)}
 .lock h2{font-size:1.5rem;margin-bottom:4px}.lock p{opacity:.8;font-weight:600;font-size:.88rem;margin:0 0 22px}
-.dots{display:flex;gap:14px;justify-content:center;height:18px;margin-bottom:6px}
-.dots i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.55);transition:all .15s}
-.dots i.f{background:#fff;border-color:#fff;transform:scale(1.15)}
-.dots.shake{animation:shake .45s}
+.lock-card.shake{animation:shake .45s}
 @keyframes shake{20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
-.lock-msg{min-height:20px;font-size:.82rem;font-weight:700;color:#FFC2CB;margin:8px 0 14px}
-.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;justify-items:center}
-.key{width:76px;height:76px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.12);color:#fff;font-size:1.6rem;font-weight:700;
-  backdrop-filter:blur(10px);transition:background .12s,transform .12s}
-.key:active{background:rgba(255,255,255,.34);transform:scale(.92)}.key.ghost{background:none;border-color:transparent;font-size:1.3rem}
-.key.go{background:#fff;color:#4B3DF5}
+.lock-field{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:18px;padding:0 14px;margin-bottom:12px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);text-align:left}
+.lock-field:focus-within{background:rgba(255,255,255,.22);border-color:#fff}
+.lock-field i{opacity:.85;font-size:1.1rem}
+.lock-field input{flex:1;min-width:0;border:0;outline:0;background:none;color:#fff;font:600 1rem 'Plus Jakarta Sans',system-ui,sans-serif;padding:15px 0}
+.lock-field input::placeholder{color:rgba(255,255,255,.65);font-weight:500}
+.lock-field input:-webkit-autofill{-webkit-text-fill-color:#fff;transition:background-color 9999s}
+.lock-field button{border:0;background:none;color:#fff;opacity:.85;padding:6px;font-size:1.1rem}
+.lock-msg{min-height:20px;font-size:.82rem;font-weight:700;color:#FFC2CB;margin:4px 0 12px}
+.lock-btn{width:100%;border:0;border-radius:18px;padding:15px;background:#fff;color:#4B3DF5;font-weight:800;font-size:1rem;box-shadow:0 14px 30px -12px rgba(0,0,0,.5);transition:transform .15s,opacity .2s}
+.lock-btn:active{transform:scale(.97)}.lock-btn:disabled{opacity:.6}
 .remember{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;font-size:.8rem;font-weight:700;opacity:.9}
 .remember input{accent-color:#fff;width:17px;height:17px}
-.demo-banner{display:flex;align-items:center;gap:8px;justify-content:center;background:var(--loan-soft);color:var(--loan);font-size:.74rem;font-weight:800;padding:6px 12px;border-radius:999px;margin:0 auto 12px;width:fit-content}
 
 .sheet-body [style*="text-align:center"]>.ico{margin:0 auto}
 
@@ -309,17 +309,18 @@ body.hide .amt{filter:blur(9px);user-select:none;transition:filter .2s}
 </head>
 <body>
 
-<!-- ===== Pantalla de PIN ===== -->
+<!-- ===== Inicio de sesión ===== -->
 <div id="lock" class="lock" hidden>
-  <div class="lock-card">
+  <form class="lock-card" id="lock-form" autocomplete="on">
     <div class="lock-logo">💰</div>
     <h2>Mis Finanzas</h2>
-    <p>Ingresa tu PIN para continuar</p>
-    <div class="dots" id="dots"></div>
+    <p>Inicia sesión para continuar</p>
+    <div class="lock-field"><i class="bi bi-person"></i><input id="l-user" name="username" autocomplete="username" placeholder="Usuario" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+    <div class="lock-field"><i class="bi bi-lock"></i><input id="l-clave" name="password" type="password" autocomplete="current-password" placeholder="Contraseña"><button type="button" id="l-eye" aria-label="Mostrar contraseña"><i class="bi bi-eye"></i></button></div>
     <div class="lock-msg" id="lock-msg"></div>
-    <div class="keys"></div>
-    <label class="remember"><input type="checkbox" id="remember" checked> Recordarme en este dispositivo</label>
-  </div>
+    <button class="lock-btn" id="l-go" type="submit">Entrar</button>
+    <label class="remember"><input type="checkbox" id="remember" checked> Mantener sesión en este dispositivo</label>
+  </form>
 </div>
 
 <!-- ===== App ===== -->
@@ -338,7 +339,6 @@ body.hide .amt{filter:blur(9px);user-select:none;transition:filter .2s}
         <button class="icon-btn" data-act="go" data-v="ajustes" aria-label="Ajustes"><i class="bi bi-gear"></i></button>
       </div>
     </header>
-    <div id="demo" class="demo-banner" hidden><i class="bi bi-flask"></i> Modo demo · datos de ejemplo (PIN 1234)</div>
     <div id="view" class="view"></div>
   </main>
 
@@ -351,9 +351,8 @@ body.hide .amt{filter:blur(9px);user-select:none;transition:filter .2s}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
 'use strict';
-const API_URL = 'https://script.google.com/macros/s/AKfycbzsRsrksxa6Is0M3VBcFuIU2mlosiI3NXfDk8KDZL9JqtXqeRPDeSgMGXghEfHUd-CC/exec';            
-const DEMO = ;         
-const DEMO_PIN = ;
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbzsRsrksxa6Is0M3VBcFuIU2mlosiI3NXfDk8KDZL9JqtXqeRPDeSgMGXghEfHUd-CC/exec';            // ← PEGA AQUÍ la URL de tu Web App de Apps Script (termina en /exec)
 
 /* ---------- utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -409,7 +408,7 @@ const SISTEMA = ['g_otros', 'i_otros', 'i_servicios', 'i_intereses'];
 
 /* ---------- estado ---------- */
 const S = {
-  pin: '', v: 0, cargado: false, lastLoad: 0,
+  token: '', v: 0, cargado: false, lastLoad: 0,
   data: { grupos: [], cuentas: [], categorias: [], movimientos: [], prestamos: [], servicios: [] },
   view: 'inicio', mes: ym(hoy()),
   filtro: 'todo', q: '', cat: '',
@@ -575,8 +574,8 @@ const cuentasRend = () => S.data.cuentas.filter(c => !isArch(c) && (Number(c.tre
 /* ---------- API ---------- */
 let _queue = Promise.resolve(), _pending = 0;
 async function callApi(action, payload = {}) {
-  if (DEMO) return demoApi(action, payload);
-  const r = await fetch(API_URL, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action, pin: S.pin, ...payload }) });
+  if (!API_URL) return { ok: false, error: 'SIN_API_URL' };
+  const r = await fetch(API_URL, { method: 'POST', redirect: 'follow', body: JSON.stringify({ action, token: S.token, ...payload }) });
   return r.json();
 }
 function applyLocal(ops) {
@@ -600,7 +599,7 @@ function commit(ops, msg) {
     _pending--; setSync(_pending ? 'saving' : 'ok');
   }).catch(async err => {
     _pending--; setSync('error');
-    if (['PIN_INCORRECTO', 'BLOQUEADO'].includes(err.message)) return logout();
+    if (['NO_AUTORIZADO', 'BLOQUEADO'].includes(err.message)) return logout();
     toast('No se pudo guardar: ' + err.message, 'danger');
     try { await cargar(true); renderAll(); } catch (e) { /* sin red */ }
   });
@@ -613,90 +612,6 @@ async function cargar() {
   S.data = normalizar(res.data); S.v++; S.cargado = true; S.lastLoad = Date.now();
 }
 
-/* ---------- modo demo (datos de ejemplo) ---------- */
-function demoApi(action, p) {
-  return new Promise(resolve => setTimeout(() => {
-    if (action === 'getAll') {
-      if (p.pin !== DEMO_PIN && S.pin !== DEMO_PIN) return resolve({ ok: false, error: 'PIN_INCORRECTO', restantes: 4 });
-      return resolve({ ok: true, data: demoData() });
-    }
-    resolve({ ok: true });
-  }, 350));
-}
-function demoData() {
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const pick = a => a[Math.floor(rnd() * a.length)];
-  const h = hoy(), mAct = ym(h);
-  const grupos = [
-    { id: 'g_efectivo', nombre: 'Efectivo', icono: '💵', tipo: 'normal', orden: 1 }, { id: 'g_cuentas', nombre: 'Cuentas', icono: '🏦', tipo: 'normal', orden: 2 },
-    { id: 'g_tarjetas', nombre: 'Tarjetas de crédito', icono: '💳', tipo: 'credito', orden: 3 }, { id: 'g_ahorros', nombre: 'Ahorros', icono: '🐷', tipo: 'ahorro', orden: 4 },
-    { id: 'g_otras', nombre: 'Otras cuentas', icono: '👜', tipo: 'normal', orden: 5 }];
-  const cuentas = [
-    { id: 'c1', grupo_id: 'g_efectivo', nombre: 'Billetera', moneda: 'PEN', saldo_inicial: 320, trea: '', orden: 1, archivada: 0 },
-    { id: 'c2', grupo_id: 'g_efectivo', nombre: 'Alcancía', moneda: 'PEN', saldo_inicial: 750, trea: '', orden: 2, archivada: 0 },
-    { id: 'c3', grupo_id: 'g_cuentas', nombre: 'Banco Sueldo', moneda: 'PEN', saldo_inicial: 2500, trea: '', orden: 1, archivada: 0 },
-    { id: 'c4', grupo_id: 'g_tarjetas', nombre: 'Visa Clásica', moneda: 'PEN', saldo_inicial: 0, trea: '', orden: 1, archivada: 0 },
-    { id: 'c5', grupo_id: 'g_ahorros', nombre: 'Ahorro para casa', moneda: 'PEN', saldo_inicial: 12000, trea: 4.5, orden: 1, archivada: 0 },
-    { id: 'c6', grupo_id: 'g_ahorros', nombre: 'Fondo de emergencia', moneda: 'PEN', saldo_inicial: 8500, trea: 5, orden: 2, archivada: 0 },
-    { id: 'c7', grupo_id: 'g_ahorros', nombre: 'Ahorro viaje', moneda: 'PEN', saldo_inicial: 3200, trea: 4, orden: 3, archivada: 0 },
-    { id: 'c8', grupo_id: 'g_otras', nombre: 'Cuenta en dólares', moneda: 'USD', saldo_inicial: 420, trea: '', orden: 1, archivada: 0 }];
-  const categorias = DEMO_CATS.map((c, i) => ({ ...c, orden: i + 1 }));
-  const movs = []; let n = 0;
-  const add = (f, tipo, cuenta, monto, o = {}) => movs.push({ id: 'm' + (++n), fecha: f, tipo, cuenta_id: cuenta, cuenta_destino_id: o.dest || '', monto: r2(monto), monto_destino: o.md ?? '', categoria_id: o.cat || '', nota: o.nota || '', ref_tipo: o.rt || '', ref_id: o.ri || '', creado: f + 'T' + pad(8 + (n % 12)) + ':00:00Z' });
-  const nGas = [['g_comida', ['Almuerzo', 'Menú', 'Cena', 'Café y pan', 'Delivery', 'Mercado'], 9, 38], ['g_transporte', ['Taxi', 'Pasaje', 'Gasolina'], 4, 28], ['g_ocio', ['Cine', 'Salida', 'Juego'], 15, 70],
-    ['g_compras', ['Compras', 'Amazon', 'Farmacia'], 20, 140], ['g_salud', ['Consulta', 'Medicinas'], 25, 90], ['g_ropa', ['Polo', 'Zapatillas'], 40, 160]];
-  for (let mo = -3; mo <= 0; mo++) {
-    const m = addMonth(mAct, mo), last = mo === 0 ? Number(h.slice(8)) : daysInMonth(m);
-    if (last >= 5) { add(`${m}-05`, 'ingreso', 'c3', 4200, { cat: 'i_salario', nota: 'Sueldo' }); }
-    if (last >= 6) { add(`${m}-06`, 'transferencia', 'c3', 1500, { dest: 'c5', nota: 'Ahorro mensual' }); add(`${m}-06`, 'transferencia', 'c3', 600, { dest: 'c6' }); }
-    if (last >= 8) { add(`${m}-08`, 'gasto', 'c3', 1250, { cat: 'g_hogar', nota: 'Alquiler' }); }
-    if (last >= 10) { add(`${m}-10`, 'gasto', 'c3', 89.9, { cat: 'g_servicios', nota: 'Internet' }); add(`${m}-10`, 'gasto', 'c3', 64.3, { cat: 'g_servicios', nota: 'Luz' }); }
-    if (last >= 3) { add(`${m}-03`, 'gasto', 'c4', 54.9, { cat: 'g_suscripciones', nota: 'Streaming' }); }
-    if (last >= 12) { add(`${m}-12`, 'gasto', 'c8', 9.99, { cat: 'g_suscripciones', nota: 'Suscripción en US$' }); }
-    for (let d = 1; d <= last; d++) {
-      const f = `${m}-${pad(d)}`;
-      if (rnd() < .85) { const [cat, notas, a, b] = pick(nGas.slice(0, 2)); add(f, 'gasto', pick(['c3', 'c3', 'c4', 'c4']), a + rnd() * (b - a), { cat, nota: pick(notas) }); }
-      if (rnd() < .5) { const [cat, notas, a, b] = pick(nGas.slice(0, 1)); add(f, 'gasto', pick(['c3', 'c4']), a + rnd() * (b - a), { cat, nota: pick(notas) }); }
-      if (rnd() < .22) { const [cat, notas, a, b] = pick(nGas.slice(2)); add(f, 'gasto', pick(['c3', 'c4']), a + rnd() * (b - a), { cat, nota: pick(notas) }); }
-    }
-    if (mo < 0) { add(`${addMonth(m, 1)}-01`, 'ingreso', 'c5', 45 + rnd() * 8, { cat: 'i_intereses', nota: 'Intereses del mes', rt: 'interes', ri: 'c5' }); }
-  }
-  add(addDays(h, -2), 'transferencia', 'c3', 900, { dest: 'c4', nota: 'Pago de tarjeta' });
-  // préstamos
-  const prestamos = [
-    { id: 'p1', direccion: 'me_deben', persona: 'Milán', concepto: 'Préstamo', monto: 50, moneda: 'PEN', cuenta_id: 'c1', fecha: addDays(h, -6), fecha_promesa: addDays(h, 4), nota: '' },
-    { id: 'p2', direccion: 'me_deben', persona: 'Carlos Rojas', concepto: 'Pagué su entrada al concierto', monto: 300, moneda: 'PEN', cuenta_id: 'c3', fecha: addDays(h, -20), fecha_promesa: addDays(h, -3), nota: '' },
-    { id: 'p3', direccion: 'me_deben', persona: 'Lucía', concepto: 'Préstamo', monto: 150, moneda: 'PEN', cuenta_id: 'c3', fecha: addDays(h, -40), fecha_promesa: addDays(h, -20), nota: '' },
-    { id: 'p4', direccion: 'debo', persona: 'Mamá', concepto: 'Adelanto del alquiler', monto: 200, moneda: 'PEN', cuenta_id: 'c3', fecha: addDays(h, -12), fecha_promesa: addDays(h, 9), nota: '' }];
-  prestamos.forEach(p => { p.creado = p.fecha + 'T09:00:00Z'; add(p.fecha, PREST[p.direccion].ini, p.cuenta_id, p.monto, { rt: 'prestamo', ri: p.id, nota: p.concepto }); });
-  add(addDays(h, -8), 'prestamo_cobro', 'c3', 100, { rt: 'prestamo', ri: 'p2', nota: 'Abono' });
-  add(addDays(h, -30), 'prestamo_cobro', 'c3', 150, { rt: 'prestamo', ri: 'p3', nota: 'Pagó completo' });
-  // servicios
-  const servicios = [
-    { id: 's1', cliente: 'Ferretería El Sol', servicio: 'Diseño de logo', monto: 450, moneda: 'PEN', fecha_servicio: addDays(h, -9), fecha_estimada: addDays(h, -2), estado: 'pendiente', fecha_cobro: '', cuenta_id: '', nota: '' },
-    { id: 's2', cliente: 'Andrea Paredes', servicio: 'Landing page', monto: 800, moneda: 'PEN', fecha_servicio: addDays(h, -3), fecha_estimada: addDays(h, 6), estado: 'pendiente', fecha_cobro: '', cuenta_id: '', nota: '' },
-    { id: 's3', cliente: 'Studio Nova', servicio: 'Asesoría mensual', monto: 120, moneda: 'USD', fecha_servicio: addDays(h, -1), fecha_estimada: addDays(h, 12), estado: 'pendiente', fecha_cobro: '', cuenta_id: '', nota: '' },
-    { id: 's4', cliente: 'Café Origen', servicio: 'Menú digital', monto: 350, moneda: 'PEN', fecha_servicio: addDays(h, -18), fecha_estimada: addDays(h, -8), estado: 'cobrado', fecha_cobro: addDays(h, -5), cuenta_id: 'c3', nota: '' }];
-  servicios.forEach(s => s.creado = s.fecha_servicio + 'T10:00:00Z');
-  add(addDays(h, -5), 'ingreso', 'c3', 350, { cat: 'i_servicios', nota: 'Menú digital · Café Origen', rt: 'servicio', ri: 's4' });
-  movs.forEach(m => { if (m.fecha > h) m.fecha = h; });
-  return { grupos, cuentas, categorias, movimientos: movs, prestamos, servicios };
-}
-const DEMO_CATS = [
-  { id: 'g_comida', tipo: 'gasto', nombre: 'Comida', icono: '🍜', color: '#F97316' }, { id: 'g_transporte', tipo: 'gasto', nombre: 'Transporte', icono: '🚌', color: '#3B82F6' },
-  { id: 'g_hogar', tipo: 'gasto', nombre: 'Hogar', icono: '🏠', color: '#A855F7' }, { id: 'g_servicios', tipo: 'gasto', nombre: 'Servicios básicos', icono: '💡', color: '#EAB308' },
-  { id: 'g_salud', tipo: 'gasto', nombre: 'Salud', icono: '💊', color: '#EF4444' }, { id: 'g_educacion', tipo: 'gasto', nombre: 'Educación', icono: '📚', color: '#6366F1' },
-  { id: 'g_ocio', tipo: 'gasto', nombre: 'Ocio', icono: '🎬', color: '#EC4899' }, { id: 'g_compras', tipo: 'gasto', nombre: 'Compras', icono: '🛍️', color: '#06B6D4' },
-  { id: 'g_ropa', tipo: 'gasto', nombre: 'Ropa', icono: '👕', color: '#8B5CF6' }, { id: 'g_suscripciones', tipo: 'gasto', nombre: 'Suscripciones', icono: '📺', color: '#14B8A6' },
-  { id: 'g_regalos', tipo: 'gasto', nombre: 'Regalos', icono: '🎁', color: '#F43F5E' }, { id: 'g_viajes', tipo: 'gasto', nombre: 'Viajes', icono: '✈️', color: '#0EA5E9' },
-  { id: 'g_mascotas', tipo: 'gasto', nombre: 'Mascotas', icono: '🐶', color: '#84CC16' }, { id: 'g_otros', tipo: 'gasto', nombre: 'Otros', icono: '📦', color: '#64748B' },
-  { id: 'i_salario', tipo: 'ingreso', nombre: 'Salario', icono: '💰', color: '#10B981' }, { id: 'i_servicios', tipo: 'ingreso', nombre: 'Servicios cobrados', icono: '🧾', color: '#06B6D4' },
-  { id: 'i_intereses', tipo: 'ingreso', nombre: 'Intereses', icono: '📈', color: '#6366F1' }, { id: 'i_ventas', tipo: 'ingreso', nombre: 'Ventas', icono: '🏷️', color: '#F59E0B' },
-  { id: 'i_bonos', tipo: 'ingreso', nombre: 'Bonos y regalos', icono: '🎉', color: '#EC4899' }, { id: 'i_otros', tipo: 'ingreso', nombre: 'Otros ingresos', icono: '➕', color: '#64748B' }];
-
-/* =====================================================================
-   MIS FINANZAS · componentes de interfaz
-   ===================================================================== */
 const ACT = {};                         // acciones disparadas por data-act
 const CH = {};                          // gráficos activos
 
@@ -833,9 +748,6 @@ function chartBase() {
 }
 function killCharts() { for (const k of Object.keys(CH)) { CH[k].destroy(); delete CH[k]; } }
 
-/* =====================================================================
-   MIS FINANZAS · vistas: Inicio, Diario, Cuentas, Rendimiento
-   ===================================================================== */
 
 /* ---------- filas de movimientos ---------- */
 function personaDe(m) { const p = S.data.prestamos.find(x => x.id === m.ref_id); return p ? p.persona : ''; }
@@ -1143,7 +1055,6 @@ function vAjustes() {
   const th = localStorage.getItem('fin_theme') || 'auto';
   const cats = catsTipo(S.setTab);
   return `<div class="stack">
-  ${DEMO ? '<div class="notice"><i class="bi bi-flask"></i><span>Modo demo: estás viendo datos de ejemplo. Pega la URL de tu Apps Script en API_URL para guardar tus datos reales.</span></div>' : ''}
   <div class="card-x"><div class="card-h"><h4>Apariencia</h4></div>${segHTML([{ v: 'auto', t: '🌓 Auto' }, { v: 'light', t: '☀️ Claro' }, { v: 'dark', t: '🌙 Oscuro' }], th, 'tema')}</div>
 
   <div class="card-x"><div class="card-h"><h4>Categorías</h4><button class="link" data-act="newCat">＋ Nueva</button></div>
@@ -1158,7 +1069,7 @@ function vAjustes() {
     <button class="btn-x line" data-act="export" data-v="servicios"><i class="bi bi-download"></i> Servicios</button><button class="btn-x line" data-act="export" data-v="cuentas"><i class="bi bi-download"></i> Cuentas</button></div>
     <div class="hint" style="margin-top:10px">Tus datos viven en tu Google Sheet; esto es una copia para abrir en Excel.</div></div>
 
-  <div class="card-x"><div class="card-h"><h4>Sesión</h4></div><button class="btn-x danger block" data-act="logout"><i class="bi bi-box-arrow-right"></i> Cerrar sesión y olvidar PIN</button></div>
+  <div class="card-x"><div class="card-h"><h4>Sesión</h4></div><button class="btn-x danger block" data-act="logout"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button></div>
   </div>`;
 }
 
@@ -1605,7 +1516,6 @@ function renderChrome() {
   $('#subtitle').textContent = S.view === 'inicio' ? cap(fechaLarga(hoy()).replace(/ \d{4}$/, '')) : ({ diario: 'Tus ingresos y gastos', cuentas: 'Dónde está tu dinero', prestamos: 'Quién te debe y a quién debes', servicios: 'Lo que tienes por cobrar', ajustes: 'Personaliza tu app' }[S.view]);
   $('#fab').hidden = S.view === 'ajustes';
   $('#fab').setAttribute('aria-label', S.view === 'prestamos' ? 'Nuevo préstamo' : S.view === 'servicios' ? 'Nuevo servicio' : 'Nuevo movimiento');
-  $('#demo').hidden = !DEMO;
   document.body.classList.toggle('hide', localStorage.getItem('fin_hide') === '1');
   const eye = $('#btn-hide i'); if (eye) eye.className = 'bi bi-eye' + (document.body.classList.contains('hide') ? '-slash' : '');
 }
@@ -1665,49 +1575,53 @@ document.addEventListener('input', e => {
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#mov-list'); if (l) l.innerHTML = listaMovs(); }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && S.cargado && !DEMO && !_pending && !sheetStack.length && Date.now() - S.lastLoad > 90000)
+  if (document.visibilityState === 'visible' && S.cargado && !_pending && !sheetStack.length && Date.now() - S.lastLoad > 90000)
     cargar().then(renderAll).catch(() => { });
 });
 
-/* ---------- PIN / sesión ---------- */
-let pinBuf = '', pinBusy = false;
-const storedPin = () => localStorage.getItem('fin_pin') || sessionStorage.getItem('fin_pin') || '';
-function paintDots() { $('#dots').innerHTML = Array.from({ length: Math.max(4, pinBuf.length) }, (_, i) => `<i class="${i < pinBuf.length ? 'f' : ''}"></i>`).join(''); }
+/* ---------- sesión (usuario y contraseña) ---------- */
+let loginBusy = false;
+const storedTok = () => localStorage.getItem('fin_tok') || sessionStorage.getItem('fin_tok') || '';
 function lockMsg(t, ok = false) { const m = $('#lock-msg'); m.textContent = t; m.style.color = ok ? '#fff' : ''; }
-function showLock(msg = '') { $('#lock').hidden = false; $('#app').hidden = true; pinBuf = ''; paintDots(); lockMsg(msg); }
+function setLoginBtn(busy) { const b = $('#l-go'); b.disabled = busy; b.textContent = busy ? 'Entrando…' : 'Entrar'; }
+function showLock(msg = '') { $('#lock').hidden = false; $('#app').hidden = true; lockMsg(msg); setLoginBtn(false); }
+function abrirApp() { $('#lock').hidden = true; $('#app').hidden = false; S.view = 'inicio'; setView('inicio'); }
+function limpiarSesion() { localStorage.removeItem('fin_tok'); sessionStorage.removeItem('fin_tok'); S.token = ''; }
 function logout() {
-  localStorage.removeItem('fin_pin'); sessionStorage.removeItem('fin_pin'); S.pin = ''; S.cargado = false; S.data = { grupos: [], cuentas: [], categorias: [], movimientos: [], prestamos: [], servicios: [] };
-  sheetStack.slice().forEach(s => s.close()); showLock();
+  if (S.token) callApi('logout').catch(() => { });
+  limpiarSesion(); S.cargado = false; S.data = { grupos: [], cuentas: [], categorias: [], movimientos: [], prestamos: [], servicios: [] };
+  sheetStack.slice().forEach(s => s.close()); $('#l-clave').value = ''; showLock();
 }
-async function entrar(pin, auto = false) {
-  if (pinBusy) return; pinBusy = true; S.pin = pin; lockMsg('Verificando…', true);
+function errorLogin(e, auto) {
+  const r = e.res || {};
+  if (r.error === 'CREDENCIALES_INCORRECTAS') { const c = $('#lock-form'); c.classList.add('shake'); setTimeout(() => c.classList.remove('shake'), 500); $('#l-clave').value = ''; showLock(`Usuario o contraseña incorrectos${r.restantes != null ? ` · te quedan ${r.restantes} intentos` : ''}`); }
+  else if (r.error === 'BLOQUEADO') showLock('Demasiados intentos. Espera 15 minutos.');
+  else if (r.error === 'NO_AUTORIZADO') { limpiarSesion(); showLock(auto ? 'Tu sesión expiró. Vuelve a iniciar sesión.' : ''); }
+  else if (r.error === 'SIN_API_URL') showLock('Falta pegar la URL del Apps Script en API_URL (index.html).');
+  else showLock('No se pudo conectar. Revisa tu internet o la URL del Apps Script.');
+}
+async function login(usuario, clave, recordar) {
+  if (loginBusy) return; loginBusy = true; setLoginBtn(true); lockMsg('');
   try {
-    await cargar();
-    const rec = $('#remember').checked;
-    (rec ? localStorage : sessionStorage).setItem('fin_pin', pin); (rec ? sessionStorage : localStorage).removeItem('fin_pin');
-    $('#lock').hidden = true; $('#app').hidden = false; S.view = 'inicio'; setView('inicio');
-  } catch (e) {
-    S.pin = ''; const r = e.res || {};
-    if (r.error === 'PIN_INCORRECTO') { localStorage.removeItem('fin_pin'); sessionStorage.removeItem('fin_pin'); $('#dots').classList.add('shake'); setTimeout(() => $('#dots').classList.remove('shake'), 500); showLock(`PIN incorrecto${r.restantes != null ? ` · te quedan ${r.restantes} intentos` : ''}`); }
-    else if (r.error === 'BLOQUEADO') showLock('Demasiados intentos. Espera 15 minutos.');
-    else showLock('No se pudo conectar. Revisa tu internet o la URL del Apps Script.');
-  }
-  pinBusy = false;
+    const r = await callApi('login', { usuario, clave, recordar });
+    if (!r || !r.ok) { const e = new Error((r && r.error) || 'ERROR'); e.res = r; throw e; }
+    S.token = r.token; await cargar();
+    (recordar ? localStorage : sessionStorage).setItem('fin_tok', S.token); (recordar ? sessionStorage : localStorage).removeItem('fin_tok');
+    localStorage.setItem('fin_user', usuario); $('#l-clave').value = ''; abrirApp();
+  } catch (e) { S.token = ''; errorLogin(e, false); }
+  loginBusy = false; setLoginBtn(false);
 }
 function initLock() {
-  $('.keys').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9, 'del', 0, 'go'].map(k => k === 'del' ? '<button class="key ghost" data-k="del" aria-label="Borrar"><i class="bi bi-backspace"></i></button>' : k === 'go' ? '<button class="key go" data-k="go" aria-label="Entrar"><i class="bi bi-arrow-right"></i></button>' : `<button class="key" data-k="${k}">${k}</button>`).join('');
-  $('.keys').addEventListener('click', e => {
-    const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k; lockMsg('');
-    if (k === 'del') pinBuf = pinBuf.slice(0, -1); else if (k === 'go') return entrar(pinBuf); else if (pinBuf.length < 8) pinBuf += k;
-    paintDots();
+  $('#l-user').value = localStorage.getItem('fin_user') || '';
+  $('#lock-form').addEventListener('submit', e => {
+    e.preventDefault(); const u = $('#l-user').value.trim(), c = $('#l-clave').value;
+    if (!u || !c) return lockMsg('Escribe tu usuario y contraseña');
+    login(u, c, $('#remember').checked);
   });
-  document.addEventListener('keydown', e => {
-    if ($('#lock').hidden) return;
-    if (/^\d$/.test(e.key) && pinBuf.length < 8) { pinBuf += e.key; lockMsg(''); paintDots(); }
-    else if (e.key === 'Backspace') { pinBuf = pinBuf.slice(0, -1); paintDots(); }
-    else if (e.key === 'Enter' && pinBuf) entrar(pinBuf);
+  $('#l-eye').addEventListener('click', () => {
+    const i = $('#l-clave'), show = i.type === 'password'; i.type = show ? 'text' : 'password';
+    $('#l-eye i').className = 'bi bi-eye' + (show ? '-slash' : '');
   });
-  paintDots();
 }
 
 /* ---------- arranque ---------- */
@@ -1716,10 +1630,11 @@ function boot() {
   $('#dock-items').innerHTML = NAV.map(([v, i, t]) => `<button class="nav-i" data-v="${v}" data-act="nav"><i class="bi bi-${i}"></i><span>${t}</span></button>`).join('')
     + `<button class="nav-i side-extra" data-v="ajustes" data-act="nav"><i class="bi bi-gear"></i><span>Ajustes</span></button>`;
   initLock();
-  const p = storedPin();
-  if (p && !DEMO) { $('#lock').hidden = false; lockMsg('Entrando…', true); entrar(p, true); }
-  else if (p && DEMO) entrar(p, true);
-  else showLock();
+  const t = storedTok();
+  if (t) {
+    S.token = t; $('#lock').hidden = false; lockMsg('Entrando…', true); setLoginBtn(true);
+    cargar().then(abrirApp).catch(e => { S.token = ''; errorLogin(e, true); });
+  } else showLock();
 }
 boot();
 
