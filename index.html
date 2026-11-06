@@ -46,7 +46,12 @@ h1,h2,h3,h4,h5{margin:0;font-weight:800;letter-spacing:-.02em}
 button{font-family:inherit;cursor:pointer}
 a{color:var(--brand)}
 .amt,.num{font-variant-numeric:tabular-nums}
-body.hide .amt{filter:blur(9px);user-select:none;transition:filter .2s}
+[data-m]{letter-spacing:.14em;user-select:none}
+body.hide .amtc{position:relative}
+body.hide .amtc canvas{visibility:hidden}
+body.hide .amtc::after{content:"••••••";position:absolute;inset:0;display:grid;place-items:center;letter-spacing:.3em;font-size:1.8rem;font-weight:800;color:var(--muted)}
+.hero .hero-eye{position:absolute;top:14px;right:14px;z-index:2;width:36px;height:36px;border-radius:12px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:1.05rem}
+.hero .hero-eye:active{transform:scale(.94)}
 .muted{color:var(--muted)} .small{font-size:.82rem} .xs{font-size:.74rem}
 .inc{color:var(--inc)} .exp{color:var(--exp)} .tr{color:var(--tr)} .loan{color:var(--loan)} .vio{color:var(--vio)}
 .fw8{font-weight:800} .fw7{font-weight:700} .fw6{font-weight:600}
@@ -351,7 +356,9 @@ body.hide .amt{filter:blur(9px);user-select:none;transition:filter .2s}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
 'use strict';
-
+/* =====================================================================
+   MIS FINANZAS · núcleo (utilidades, estado, cálculos, API)
+   ===================================================================== */
 const API_URL = 'https://script.google.com/macros/s/AKfycbzsRsrksxa6Is0M3VBcFuIU2mlosiI3NXfDk8KDZL9JqtXqeRPDeSgMGXghEfHUd-CC/exec';            // ← PEGA AQUÍ la URL de tu Web App de Apps Script (termina en /exec)
 
 /* ---------- utilidades ---------- */
@@ -612,6 +619,9 @@ async function cargar() {
   S.data = normalizar(res.data); S.v++; S.cargado = true; S.lastLoad = Date.now();
 }
 
+/* =====================================================================
+   MIS FINANZAS · componentes de interfaz
+   ===================================================================== */
 const ACT = {};                         // acciones disparadas por data-act
 const CH = {};                          // gráficos activos
 
@@ -748,6 +758,21 @@ function chartBase() {
 }
 function killCharts() { for (const k of Object.keys(CH)) { CH[k].destroy(); delete CH[k]; } }
 
+/* ---- ocultar montos: puntos (global) + ojo individual en los totales principales ---- */
+const ocGlobal = () => localStorage.getItem('fin_hide') === '1';
+const ocKey = k => { const o = localStorage.getItem('fin_hk_' + k); return o ? o === 'h' : ocGlobal(); };
+const heroEye = k => `<button class="hero-eye" data-act="heroEye" data-k="${k}" aria-label="Mostrar u ocultar este total"><i class="bi bi-eye${ocKey(k) ? '-slash' : ''}"></i></button>`;
+function maskAmts(root = document) {
+  const g = ocGlobal();
+  root.querySelectorAll('.amt:not([data-m])').forEach(el => {
+    const h = el.closest('[data-hk]');
+    if (h ? ocKey(h.dataset.hk) : g) { el.dataset.m = '1'; el.textContent = '••••'; }
+  });
+}
+
+/* =====================================================================
+   MIS FINANZAS · vistas: Inicio, Diario, Cuentas, Rendimiento
+   ===================================================================== */
 
 /* ---------- filas de movimientos ---------- */
 function personaDe(m) { const p = S.data.prestamos.find(x => x.id === m.ref_id); return p ? p.persona : ''; }
@@ -813,7 +838,7 @@ function vInicio() {
   const ult = [...S.data.movimientos].sort(sortMov).slice(0, 6);
 
   return `<div class="stack">
-  <section class="hero">
+  <section class="hero" data-hk="inicio">${heroEye('inicio')}
     <div class="hero-l">Capital neto</div>
     <div class="hero-amt amt">${money(net)}</div>
     <div class="hero-sub amt">${hasUSD ? '＋ ' + money(netU, 'USD') + ' en dólares · ' : ''}${nCuentas} ${nCuentas === 1 ? 'cuenta' : 'cuentas'}</div>
@@ -843,14 +868,14 @@ function vInicio() {
   <div class="grid-auto">
     <div class="card-x">
       <div class="card-h"><h4>¿En qué gasto más?</h4><span class="pill brand">${cap(MESES[Number(S.mes.slice(5)) - 1])}</span></div>
-      ${totalGas > 0 ? `<div class="donut-wrap amt"><canvas id="ch-donut"></canvas></div><div class="catlist">${catHTML}</div>
+      ${totalGas > 0 ? `<div class="donut-wrap amtc"><canvas id="ch-donut"></canvas></div><div class="catlist">${catHTML}</div>
       <div class="mini-stats"><div><small>Promedio diario</small><b class="amt">${money(totalGas / Math.max(1, diasTrans))}</b></div><div><small>Mayor gasto</small><b class="amt">${st.mayor ? money(st.mayor.monto) : '—'}</b></div><div><small>Movimientos</small><b>${st.nGas}</b></div></div>`
       : empty('🧾', 'Sin gastos este mes', 'Cuando registres gastos verás aquí en qué se va tu dinero.')}
       ${usdCats.length ? `<div class="mini-stats" style="grid-template-columns:1fr"><div><small>Gastos en dólares</small><b class="amt">${usdCats.map(([id, v]) => `${esc(catBy(id)?.icono || '')} ${money(v, 'USD')}`).join(' · ')}</b></div></div>` : ''}
     </div>
     <div class="stack" style="align-content:start">
-      <div class="card-x"><div class="card-h"><h4>Ingresos vs gastos</h4><span class="xs muted fw7">6 meses</span></div><div class="chart-wrap amt"><canvas id="ch-bars"></canvas></div></div>
-      <div class="card-x"><div class="card-h"><h4>Evolución del capital</h4><span class="xs muted fw7">en soles</span></div><div class="chart-wrap amt"><canvas id="ch-line"></canvas></div></div>
+      <div class="card-x"><div class="card-h"><h4>Ingresos vs gastos</h4><span class="xs muted fw7">6 meses</span></div><div class="chart-wrap amtc"><canvas id="ch-bars"></canvas></div></div>
+      <div class="card-x"><div class="card-h"><h4>Evolución del capital</h4><span class="xs muted fw7">en soles</span></div><div class="chart-wrap amtc"><canvas id="ch-line"></canvas></div></div>
     </div>
   </div>
 
@@ -961,7 +986,7 @@ function vCuentas() {
       <span class="fw8 amt ${cr && tot.PEN < 0 ? 'exp' : ''}">${dual(cr ? { PEN: -tot.PEN, USD: -tot.USD } : tot)}</span><i class="bi bi-chevron-down caret"></i></button>${closed ? '' : `<div class="grp-b">${rows}</div>`}</div>`;
   }).join('');
   return `<div class="stack">${seg}
-  <section class="hero h-save"><div class="hero-l">Balance (capital − deudas)</div><div class="hero-amt amt">${money(net)}</div>${hasUSD ? `<div class="hero-sub amt">＋ ${money(netoDe(R, 'USD'), 'USD')} en dólares</div>` : ''}
+  <section class="hero h-save" data-hk="cuentas">${heroEye('cuentas')}<div class="hero-l">Balance (capital − deudas)</div><div class="hero-amt amt">${money(net)}</div>${hasUSD ? `<div class="hero-sub amt">＋ ${money(netoDe(R, 'USD'), 'USD')} en dólares</div>` : ''}
   <div class="hero-chips" style="grid-template-columns:1fr 1fr"><div class="glass"><span>Capital</span><b class="amt">${money(cap_)}</b></div><div class="glass ${R.PEN.deuda > 0 ? 'warn' : ''}"><span>A deber</span><b class="amt">${money(R.PEN.deuda)}</b></div></div></section>
   ${groups || `<div class="card-x">${empty('🏦', 'Sin cuentas', 'Crea tus cuentas con el saldo que tienes hoy.')}</div>`}
   <button class="btn-x soft block" data-act="newCuenta"><i class="bi bi-plus-lg"></i> Nueva cuenta</button></div>`;
@@ -981,7 +1006,7 @@ function vRend() {
     <div class="xs muted fw7" style="margin-top:10px;text-align:center">≈ ${money(i.anual, c.moneda)} al año con el saldo actual</div></div>`;
   }).join('');
   return `${monthNav()}
-  <section class="hero h-save"><div class="hero-l">Intereses estimados · ${cap(monthLabel(m))}</div><div class="hero-amt amt">＋${money(tot)}</div><div class="hero-sub">Solo referencia: no se suma a tu saldo hasta que registres el pago real</div>
+  <section class="hero h-save" data-hk="rend">${heroEye('rend')}<div class="hero-l">Intereses estimados · ${cap(monthLabel(m))}</div><div class="hero-amt amt">＋${money(tot)}</div><div class="hero-sub">Solo referencia: no se suma a tu saldo hasta que registres el pago real</div>
   <div class="hero-chips" style="grid-template-columns:1fr 1fr"><div class="glass"><span>Ya recibido</span><b class="amt">${money(real)}</b></div><div class="glass"><span>Al año (estimado)</span><b class="amt">${money(anual)}</b></div></div></section>
   ${cards}
   <div class="notice" style="background:var(--brand-soft);color:var(--brand)"><i class="bi bi-info-circle"></i><span>Interés diario = ((1 + TREA)^(1/360) − 1) × saldo del día, redondeado a 2 decimales y sumado todos los días del mes (como lo calcula tu banco).</span></div>`;
@@ -1018,7 +1043,7 @@ function vPrestamos() {
   const body = personas.map(x => `<div class="person"><div class="person-h">${avatar(x.nombre, 42)}<div class="nm">${esc(x.nombre)}<small>${x.items.length} ${x.items.length === 1 ? 'registro' : 'registros'}${x.venc ? ` · <span class="exp">${x.venc} vencido${x.venc > 1 ? 's' : ''}</span>` : ''}</small></div>
     <div style="text-align:right"><b class="amt ${me ? 'loan' : 'vio'}">${dual(x.tot)}</b><div class="xs muted fw7">${S.prestEstado === 'activos' ? 'pendiente' : 'pagado'}</div></div></div>${x.items.map(deudaCard).join('')}</div>`).join('');
   return `<div class="stack">
-  <section class="hero h-loan"><div class="hero-l">${me ? 'Lo que me deben' : 'Lo que yo debo'}</div><div class="hero-amt amt">${dualHero(T.t)}</div>
+  <section class="hero h-loan" data-hk="prest">${heroEye('prest')}<div class="hero-l">${me ? 'Lo que me deben' : 'Lo que yo debo'}</div><div class="hero-amt amt">${dualHero(T.t)}</div>
     <div class="hero-sub">${T.n ? `${T.personas} ${T.personas === 1 ? 'persona' : 'personas'} · ${T.n} ${T.n === 1 ? 'préstamo activo' : 'préstamos activos'}` : (me ? 'Nadie te debe nada 🎉' : 'No debes nada 🎉')}</div>
     <div class="hero-chips"><div class="glass ${T.venc ? 'warn' : ''}"><span>Vencidos</span><b>${T.venc}</b></div><div class="glass"><span>${me ? 'Prestado mes' : 'Recibido mes'}</span><b class="amt">${dual(me ? stMes.pre : { PEN: S.data.movimientos.filter(m => m.tipo === 'deuda_recibida' && ym(m.fecha) === ym(h) && curOf(m.cuenta_id) === 'PEN').reduce((a, b) => a + b.monto, 0) })}</b></div><div class="glass"><span>${me ? 'Cobrado mes' : 'Pagado mes'}</span><b class="amt">${dual(me ? stMes.cob : { PEN: S.data.movimientos.filter(m => m.tipo === 'deuda_pago' && ym(m.fecha) === ym(h)).reduce((a, b) => a + b.monto, 0) })}</b></div></div></section>
   ${segHTML([{ v: 'me_deben', t: 'Me deben', n: prestTotales('me_deben').n }, { v: 'debo', t: 'Yo debo', n: prestTotales('debo').n }], S.prestTab, 'prestTab')}
@@ -1043,7 +1068,7 @@ function vServicios() {
   cobs.sort((a, b) => (b.fecha_cobro || '').localeCompare(a.fecha_cobro || ''));
   const L = S.servTab === 'pendientes' ? pend : cobs;
   return `<div class="stack">
-  <section class="hero h-serv"><div class="hero-l">Servicios por cobrar</div><div class="hero-amt amt">${dualHero(T.t)}</div><div class="hero-sub">${T.n ? `${T.n} ${T.n === 1 ? 'servicio pendiente' : 'servicios pendientes'}` : 'Todo cobrado ✅'}</div>
+  <section class="hero h-serv" data-hk="serv">${heroEye('serv')}<div class="hero-l">Servicios por cobrar</div><div class="hero-amt amt">${dualHero(T.t)}</div><div class="hero-sub">${T.n ? `${T.n} ${T.n === 1 ? 'servicio pendiente' : 'servicios pendientes'}` : 'Todo cobrado ✅'}</div>
   <div class="hero-chips" style="grid-template-columns:1fr 1fr"><div class="glass ${T.venc ? 'warn' : ''}"><span>Vencidos</span><b>${T.venc}</b></div><div class="glass"><span>Cobrado este mes</span><b class="amt">${dual(T.cobMes)}</b></div></div></section>
   ${segHTML([{ v: 'pendientes', t: 'Pendientes', n: pend.length }, { v: 'cobrados', t: 'Cobrados', n: cobs.length }], S.servTab, 'servTab')}
   ${L.length ? L.map(servCard).join('') : `<div class="card-x">${empty(S.servTab === 'pendientes' ? '🧾' : '💸', S.servTab === 'pendientes' ? 'Sin servicios pendientes' : 'Aún no hay cobros', 'Registra cada servicio que realizas y la fecha en que esperas que te paguen. Al cobrarlo, el dinero entra a la cuenta que elijas.', S.servTab === 'pendientes' ? '<button class="btn-x" data-act="newServ"><i class="bi bi-plus-lg"></i> Nuevo servicio</button>' : '')}</div>`}
@@ -1185,460 +1210,4 @@ function sheetCuenta(opts = {}) {
       const sync = () => { const cr = isCr(val(sh, 'c-grupo')); sh.$('#c-lbl').textContent = cr ? 'Deuda actual (lo que debes)' : 'Saldo inicial (lo que tienes hoy)'; sh.$('#c-trea-w').hidden = cr; setCurLabels(sh, 'c-saldo', val(sh, 'c-mon')); };
       sh.$('#c-grupo').onchange = sync; sh.$('#c-mon').onchange = sync; sync();
       if (!ed) setTimeout(() => sh.$('#c-nombre')?.focus(), 380);
-      sh.$('[data-save]').onclick = () => {
-        const nombre = val(sh, 'c-nombre'); if (!nombre) { toast('Ponle un nombre a la cuenta', 'danger'); return sh.$('#c-nombre').focus(); }
-        const gid = val(sh, 'c-grupo'), cr = isCr(gid); let saldo = num(sh, 'c-saldo'); if (cr) saldo = -Math.abs(saldo);
-        const trea = cr ? '' : parseMonto(val(sh, 'c-trea')) || '';
-        const c = { id: ed?.id || uid('c_'), grupo_id: gid, nombre, moneda: val(sh, 'c-mon'), saldo_inicial: saldo, trea, orden: ed?.orden || (S.data.cuentas.filter(x => x.grupo_id === gid).length + 1), archivada: ed?.archivada || 0, creado: ed?.creado || nowISO() };
-        sh.close(); commit([up('Cuentas', c)], ed ? 'Cuenta actualizada' : 'Cuenta creada');
-      };
-      const d = sh.$('[data-del]'); if (d) d.onclick = async () => {
-        const usa = S.data.movimientos.some(m => m.cuenta_id === ed.id || m.cuenta_destino_id === ed.id);
-        if (usa) { if (await confirmBox({ title: 'Archivar cuenta', msg: 'Tiene movimientos, así que se archivará: dejará de aparecer y de sumar en tus totales.', ok: 'Archivar' })) { sh.close(); commit([up('Cuentas', { id: ed.id, archivada: 1 })], 'Cuenta archivada'); } }
-        else if (await confirmBox({ title: 'Eliminar cuenta', msg: 'Esta cuenta no tiene movimientos. Se eliminará definitivamente.', ok: 'Eliminar', danger: true })) { sh.close(); commit([del('Cuentas', ed.id)], 'Cuenta eliminada'); }
-      };
-    }
-  });
-}
-
-function sheetCuentaDet(id) {
-  const c = cuentaBy(id); if (!c) return;
-  const g = grupoBy(c.grupo_id), b = saldoDe(id), cr = g?.tipo === 'credito';
-  const movs = S.data.movimientos.filter(m => efectos(m).some(([x]) => x === id)).sort(sortMov).slice(0, 15);
-  const i = interesMes(c, ym(hoy()));
-  const sh = openSheet({
-    title: esc(c.nombre),
-    html: `<div style="text-align:center;margin:4px 0 16px"><div class="xs muted fw7">${esc(g?.icono || '')} ${esc(g?.nombre || '')}${c.moneda === 'USD' ? ' · dólares' : ''}</div>
-      <div class="big-num amt ${b < 0 && !cr ? 'exp' : ''}" style="margin:4px 0">${cr ? (b < 0 ? money(-b, c.moneda) : money(0, c.moneda)) : money(b, c.moneda)}</div>
-      <div class="xs muted fw7">${cr ? 'Saldo a pagar' : 'Saldo actual'}</div>${i ? `<div style="margin-top:8px"><span class="pill ok">TREA ${i.trea}% · ≈ ＋${money(i.estimado, c.moneda)} este mes</span></div>` : ''}</div>
-      <div class="grid-2 keep" style="margin-bottom:6px"><button class="btn-x soft" data-a="ajuste"><i class="bi bi-sliders"></i> Ajustar saldo</button><button class="btn-x soft" data-a="trans"><i class="bi bi-arrow-left-right"></i> ${cr ? 'Pagar tarjeta' : 'Transferir'}</button></div>
-      <div class="fld" style="margin:16px 0 6px"><label>Últimos movimientos</label></div>
-      <div class="card-x flush" style="box-shadow:none">${movs.length ? movs.map(m => movRow(m, true)).join('') : '<div class="empty" style="padding:22px"><p style="margin:0">Aún sin movimientos.</p></div>'}</div>`,
-    foot: `<button class="btn-x line" data-a="edit"><i class="bi bi-pencil"></i> Editar cuenta</button>`,
-    onMount: sh => {
-      sh.$('[data-a=edit]').onclick = () => { sh.close(); sheetCuenta({ id }); };
-      sh.$('[data-a=ajuste]').onclick = () => { sh.close(); sheetAjuste(id); };
-      sh.$('[data-a=trans]').onclick = () => { sh.close(); if (cr) sheetMov({ tipo: 'transferencia', cuenta: S.data.cuentas.find(x => !isArch(x) && x.id !== id && grupoBy(x.grupo_id)?.tipo !== 'credito')?.id }); else sheetMov({ tipo: 'transferencia', cuenta: id }); };
-      sh.el.addEventListener('click', e => { if (e.target.closest('[data-act=editMov]')) sh.close(); });
-    }
-  });
-}
-
-function sheetAjuste(id) {
-  const c = cuentaBy(id), cr = grupoBy(c.grupo_id)?.tipo === 'credito', b = saldoDe(id);
-  openSheet({
-    title: 'Ajustar saldo',
-    html: `<p class="muted fw6" style="margin:0 0 14px">Escribe cuánto ${cr ? 'debes realmente' : 'tienes realmente'} en <b style="color:var(--text)">${esc(c.nombre)}</b>. Se creará un ajuste (no cuenta como ingreso ni gasto).</p>
-    ${F.field(cr ? 'Deuda real' : 'Saldo real', F.money('a-real', c.moneda, ''), `En la app figura: ${cr ? money(Math.max(0, -b), c.moneda) : money(b, c.moneda)}`)}`,
-    foot: '<button class="btn-x" data-save>Aplicar ajuste</button>',
-    onMount: sh => {
-      setTimeout(() => sh.$('#a-real').focus(), 380);
-      sh.$('[data-save]').onclick = () => {
-        const raw = sh.$('#a-real').value.trim(); if (raw === '') return toast('Escribe el saldo real', 'danger');
-        let real = parseMonto(raw); if (cr) real = -Math.abs(real);
-        const dif = r2(real - b); if (Math.abs(dif) < 0.005) { sh.close(); return toast('El saldo ya coincide'); }
-        const t = dif > 0 ? 'ingreso' : 'gasto';
-        const mv = { id: uid('m_'), fecha: hoy(), tipo: t, cuenta_id: id, cuenta_destino_id: '', monto: Math.abs(dif), monto_destino: '', categoria_id: catDefault(t)?.id || '', nota: 'Ajuste de saldo', ref_tipo: 'ajuste', ref_id: '', creado: nowISO() };
-        sh.close(); commit([up('Movimientos', mv)], 'Saldo ajustado');
-      };
-    }
-  });
-}
-
-function sheetInteres(id) {
-  const c = cuentaBy(id), m = S.mes, i = interesMes(c, m), fin = `${m}-${pad(daysInMonth(m))}`, h = hoy();
-  openSheet({
-    title: 'Interés recibido',
-    html: `<p class="muted fw6" style="margin:0 0 14px">${esc(c.nombre)} · ${cap(monthLabel(m))}. Estimado: <b class="inc">${money(i.estimado, c.moneda)}</b></p>
-    ${F.field('Interés que te pagó el banco', F.money('i-monto', c.moneda, i.estimado.toFixed(2)))}${F.field('Fecha', F.date('i-fecha', fin > h ? h : fin))}`,
-    foot: '<button class="btn-x" data-save>Registrar ingreso</button>',
-    onMount: sh => {
-      bindDateChips(sh);
-      sh.$('[data-save]').onclick = () => {
-        const monto = num(sh, 'i-monto'); if (!(monto > 0)) return toast('Escribe el monto', 'danger');
-        const mv = { id: uid('m_'), fecha: val(sh, 'i-fecha') || h, tipo: 'ingreso', cuenta_id: id, cuenta_destino_id: '', monto, monto_destino: '', categoria_id: catBy('i_intereses') ? 'i_intereses' : (catDefault('ingreso')?.id || ''), nota: `Intereses de ${monthLabel(m)}`, ref_tipo: 'interes', ref_id: id, creado: nowISO() };
-        sh.close(); commit([up('Movimientos', mv)], 'Interés registrado');
-      };
-    }
-  });
-}
-
-/* ===================== PRÉSTAMOS ===================== */
-function sheetPrestamo(opts = {}) {
-  if (!S.data.cuentas.some(c => !isArch(c))) { toast('Primero crea una cuenta', 'danger'); return sheetCuenta(); }
-  const ed = opts.id ? S.data.prestamos.find(p => p.id === opts.id) : null;
-  const info = ed ? prestMap().get(ed.id) : null;
-  let dir = ed?.direccion || opts.dir || (S.prestTab === 'debo' ? 'debo' : 'me_deben');
-  const personas = [...new Set(S.data.prestamos.map(p => p.persona.trim()))];
-  const h = hoy();
-  const sh = openSheet({
-    title: ed ? 'Editar préstamo' : 'Nuevo préstamo',
-    html: `${ed ? '' : `<div class="seg" style="margin-bottom:16px"><button type="button" data-dir="me_deben" class="${dir === 'me_deben' ? 'on' : ''}">Presté / pagué por alguien</button><button type="button" data-dir="debo" class="${dir === 'debo' ? 'on' : ''}">Me prestaron</button></div>`}
-    ${F.field('Persona', F.text('p-persona', ed?.persona || '', 'Ej. Milán', 'list="p-list"') + `<datalist id="p-list">${personas.map(p => `<option value="${esc(p)}">`).join('')}</datalist>`)}
-    ${F.field('Monto', F.money('p-monto', ed?.moneda || curOf(ed?.cuenta_id || lastCuenta()), ed ? String(ed.monto) : ''))}
-    ${F.field('<span id="p-lbl-c"></span>', F.cuentas('p-cuenta', ed?.cuenta_id || lastCuenta()))}
-    ${F.field('Concepto', F.text('p-concepto', ed?.concepto || '', 'Ej. Préstamo, pagué su almuerzo, entrada…'))}
-    ${F.field('Fecha del préstamo', F.date('p-fecha', ed?.fecha || h))}
-    <div class="fld"><label>Fecha en que prometió pagar</label><div class="date-row"><input type="date" id="p-prom" class="form-control" value="${esc(ed?.fecha_promesa || '')}"></div>
-      <div class="chips" style="margin-top:2px"><button type="button" class="chip" data-prom="7">+7 días</button><button type="button" class="chip" data-prom="15">+15 días</button><button type="button" class="chip" data-prom="30">+30 días</button><button type="button" class="chip" data-prom="0">Sin fecha</button></div></div>
-    ${F.field('Nota (opcional)', F.text('p-nota', ed?.nota || '', ''))}`,
-    foot: `${ed ? '<button class="btn-x danger fit" data-del aria-label="Eliminar"><i class="bi bi-trash3"></i></button>' : ''}<button class="btn-x" data-save>${ed ? 'Guardar' : 'Registrar'}</button>`,
-    onMount: sh => {
-      bindDateChips(sh);
-      const lbl = () => { sh.$('#p-lbl-c').textContent = dir === 'me_deben' ? '¿De qué cuenta salió el dinero?' : '¿A qué cuenta entró el dinero?'; setCurLabels(sh, 'p-monto', curOf(val(sh, 'p-cuenta'))); };
-      lbl(); sh.$('#p-cuenta').onchange = lbl;
-      sh.$$('[data-dir]').forEach(b => b.onclick = () => { dir = b.dataset.dir; sh.$$('[data-dir]').forEach(x => x.classList.toggle('on', x === b)); lbl(); });
-      sh.$$('[data-prom]').forEach(b => b.onclick = () => { const n = Number(b.dataset.prom); sh.$('#p-prom').value = n ? addDays(val(sh, 'p-fecha') || h, n) : ''; });
-      if (!ed) setTimeout(() => sh.$('#p-persona')?.focus(), 380);
-      sh.$('[data-save]').onclick = () => {
-        const persona = val(sh, 'p-persona'), monto = num(sh, 'p-monto'), cuenta = val(sh, 'p-cuenta'), fecha = val(sh, 'p-fecha') || h;
-        if (!persona) { toast('¿A quién le prestaste?', 'danger'); return sh.$('#p-persona').focus(); }
-        if (!(monto > 0)) { toast('Escribe el monto', 'danger'); return sh.$('#p-monto').focus(); }
-        if (info && monto < info.pagado - 0.004) return toast(`Ya se pagó ${money(info.pagado, ed.moneda)}; el monto no puede ser menor`, 'danger');
-        const concepto = val(sh, 'p-concepto') || 'Préstamo';
-        const p = { id: ed?.id || uid('p_'), direccion: ed?.direccion || dir, persona, concepto, monto, moneda: curOf(cuenta), cuenta_id: cuenta, fecha, fecha_promesa: val(sh, 'p-prom'), nota: val(sh, 'p-nota'), creado: ed?.creado || nowISO() };
-        const iniId = ed ? (S.data.movimientos.find(m => m.ref_id === ed.id && m.tipo === PREST[ed.direccion].ini)?.id) : null;
-        const mv = { id: iniId || 'm0_' + p.id, fecha, tipo: PREST[p.direccion].ini, cuenta_id: cuenta, cuenta_destino_id: '', monto, monto_destino: '', categoria_id: '', nota: concepto, ref_tipo: 'prestamo', ref_id: p.id, creado: ed?.creado || nowISO() };
-        localStorage.setItem('fin_lastcuenta', cuenta);
-        sh.close(); commit([up('Prestamos', p), up('Movimientos', mv)], ed ? 'Préstamo actualizado' : (p.direccion === 'me_deben' ? `Registrado: ${persona} te debe ${money(monto, p.moneda)}` : `Registrado: le debes ${money(monto, p.moneda)} a ${persona}`));
-      };
-      const d = sh.$('[data-del]'); if (d) d.onclick = () => { sh.close(); borrarPrestamo(ed.id); };
-    }
-  });
-}
-async function borrarPrestamo(id) {
-  const e = prestMap().get(id); if (!e) return;
-  if (await confirmBox({ title: 'Eliminar préstamo', msg: `Se eliminará el préstamo de <b>${esc(e.p.persona)}</b> con todos sus abonos, y el saldo de tus cuentas se recalculará.`, ok: 'Eliminar', danger: true }))
-    commit([del('Prestamos', id), delWhere('Movimientos', 'ref_id', id)], 'Préstamo eliminado');
-}
-
-function sheetAbono(id) {
-  const e = prestMap().get(id); if (!e) return; const p = e.p, me = p.direccion === 'me_deben';
-  const sh = openSheet({
-    title: me ? 'Registrar cobro' : 'Registrar pago',
-    html: `<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">${avatar(p.persona, 46)}<div style="flex:1"><div class="fw8">${esc(p.persona)}</div><div class="xs muted fw7">${esc(p.concepto)} · pendiente ${money(e.pendiente, p.moneda)}</div></div></div>
-    ${F.field(me ? '¿Cuánto te pagó?' : '¿Cuánto pagaste?', F.money('b-monto', p.moneda, e.pendiente.toFixed(2)))}
-    <div class="chips" style="margin:-8px 0 12px"><button type="button" class="chip" data-frac="1">Todo</button><button type="button" class="chip" data-frac=".5">La mitad</button></div>
-    ${F.field(me ? '¿A qué cuenta entró?' : '¿De qué cuenta salió?', F.cuentas('b-cuenta', cuentaBy(p.cuenta_id) && !isArch(cuentaBy(p.cuenta_id)) ? p.cuenta_id : lastCuenta(), { cur: p.moneda || 'PEN' }))}
-    ${F.field('Fecha', F.date('b-fecha', hoy()))}${F.field('Nota (opcional)', F.text('b-nota', '', 'Ej. Yape, efectivo…'))}`,
-    foot: '<button class="btn-x" data-save>Guardar</button>',
-    onMount: sh => {
-      bindDateChips(sh);
-      sh.$$('[data-frac]').forEach(b => b.onclick = () => { sh.$('#b-monto').value = (e.pendiente * Number(b.dataset.frac)).toFixed(2); });
-      sh.$('[data-save]').onclick = () => {
-        const monto = num(sh, 'b-monto'), cuenta = val(sh, 'b-cuenta');
-        if (!(monto > 0)) return toast('Escribe el monto', 'danger');
-        if (monto > e.pendiente + 0.004) return toast(`El pendiente es ${money(e.pendiente, p.moneda)}`, 'danger');
-        if (!cuenta) return toast(`Necesitas una cuenta en ${p.moneda === 'USD' ? 'dólares' : 'soles'}`, 'danger');
-        const mv = { id: uid('m_'), fecha: val(sh, 'b-fecha') || hoy(), tipo: PREST[p.direccion].abo, cuenta_id: cuenta, cuenta_destino_id: '', monto, monto_destino: '', categoria_id: '', nota: val(sh, 'b-nota') || 'Abono', ref_tipo: 'prestamo', ref_id: id, creado: nowISO() };
-        const saldo = monto >= e.pendiente - 0.004;
-        sh.close(); commit([up('Movimientos', mv)], saldo ? '¡Deuda saldada! 🎉' : (me ? 'Cobro registrado' : 'Pago registrado'));
-      };
-    }
-  });
-}
-
-function sheetPrestDet(id) {
-  const e = prestMap().get(id); if (!e) return; const p = e.p, me = p.direccion === 'me_deben', c = cuentaBy(p.cuenta_id);
-  const ini = S.data.movimientos.find(m => m.ref_id === id && m.tipo === PREST[p.direccion].ini);
-  const sh = openSheet({
-    title: esc(p.persona),
-    html: `<div style="text-align:center;margin:2px 0 14px">${avatar(p.persona, 56)}<div class="xs muted fw7" style="margin-top:8px">${me ? 'Te debe' : 'Le debes'}</div>
-      <div class="big-num amt ${e.saldado ? 'inc' : (me ? 'loan' : 'vio')}">${e.saldado ? '¡Saldado!' : money(e.pendiente, p.moneda)}</div>
-      <div class="bar" style="--c:${me ? 'var(--loan)' : 'var(--vio)'};margin:10px 0 8px"><i style="width:${e.pct}%"></i></div>
-      <div class="xs muted fw7">${money(e.pagado, p.moneda)} pagados de ${money(p.monto, p.moneda)}</div><div style="margin-top:8px">${vencBadge(e.dias, e.saldado)}</div></div>
-      <div class="fld" style="margin:18px 0 4px"><label>Historial</label></div>
-      <div class="timeline">
-        <div class="tl">${icoEmoji(me ? '🤝' : '🙏', me ? '#E8890C' : '#8B5CF6', 'sm')}<div class="mid"><div class="t">${esc(p.concepto || 'Préstamo')}</div><div class="s">${fechaLarga(p.fecha)} · ${esc(c?.nombre || '—')}</div></div><b class="amt">${money(p.monto, p.moneda)}</b></div>
-        ${e.abonos.map(a => `<div class="tl">${icoEmoji('💸', '#10B981', 'sm')}<div class="mid"><div class="t">${esc(a.nota || 'Abono')}</div><div class="s">${fechaLarga(a.fecha)} · ${esc(cuentaBy(a.cuenta_id)?.nombre || '—')}</div></div><b class="amt inc">${money(a.monto, p.moneda)}</b><button class="icon-btn ghost" style="width:34px;height:34px" data-delabono="${esc(a.id)}" aria-label="Quitar abono"><i class="bi bi-x-circle"></i></button></div>`).join('')}
-      </div>${p.nota ? `<div class="hint" style="margin-top:12px">📝 ${esc(p.nota)}</div>` : ''}${p.fecha_promesa ? `<div class="hint" style="margin-top:6px">📅 Prometió pagar el ${fechaLarga(p.fecha_promesa)}</div>` : ''}`,
-    foot: `<button class="btn-x danger fit" data-a="del" aria-label="Eliminar"><i class="bi bi-trash3"></i></button><button class="btn-x line" data-a="edit"><i class="bi bi-pencil"></i> Editar</button>${!e.saldado ? `<button class="btn-x" data-a="abono">${me ? 'Registrar cobro' : 'Registrar pago'}</button>` : ''}`,
-    onMount: sh => {
-      sh.$('[data-a=edit]').onclick = () => { sh.close(); sheetPrestamo({ id }); };
-      sh.$('[data-a=del]').onclick = () => { sh.close(); borrarPrestamo(id); };
-      const ab = sh.$('[data-a=abono]'); if (ab) ab.onclick = () => { sh.close(); sheetAbono(id); };
-      sh.$$('[data-delabono]').forEach(b => b.onclick = async () => {
-        if (await confirmBox({ title: 'Quitar abono', msg: 'El abono se eliminará y el saldo de la cuenta se recalculará.', ok: 'Quitar', danger: true })) { sh.close(); commit([del('Movimientos', b.dataset.delabono)], 'Abono eliminado'); setTimeout(() => sheetPrestDet(id), 350); }
-      });
-    }
-  });
-}
-
-/* ===================== SERVICIOS ===================== */
-function sheetServicio(opts = {}) {
-  const ed = opts.id ? S.data.servicios.find(s => s.id === opts.id) : null, h = hoy();
-  const clientes = [...new Set(S.data.servicios.map(s => s.cliente.trim()))];
-  let mon = ed?.moneda || 'PEN';
-  openSheet({
-    title: ed ? 'Editar servicio' : 'Nuevo servicio',
-    html: `${F.field('Cliente', F.text('s-cliente', ed?.cliente || '', 'Ej. Ferretería El Sol', 'list="s-list"') + `<datalist id="s-list">${clientes.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`)}
-    ${F.field('Servicio realizado', F.text('s-serv', ed?.servicio || '', 'Ej. Diseño de logo'))}
-    <div class="seg" style="margin-bottom:12px"><button type="button" data-mon="PEN" class="${mon === 'PEN' ? 'on' : ''}">S/ Soles</button><button type="button" data-mon="USD" class="${mon === 'USD' ? 'on' : ''}">US$ Dólares</button></div>
-    ${F.field('Monto a cobrar', F.money('s-monto', mon, ed ? String(ed.monto) : ''))}
-    ${F.field('Fecha del servicio', F.date('s-fecha', ed?.fecha_servicio || h))}
-    <div class="fld"><label>Fecha en que debería pagarme</label><div class="date-row"><input type="date" id="s-est" class="form-control" value="${esc(ed?.fecha_estimada || '')}"></div>
-      <div class="chips" style="margin-top:2px"><button type="button" class="chip" data-prom="7">+7 días</button><button type="button" class="chip" data-prom="15">+15 días</button><button type="button" class="chip" data-prom="30">+30 días</button><button type="button" class="chip" data-prom="0">Sin fecha</button></div></div>
-    ${F.field('Nota (opcional)', F.text('s-nota', ed?.nota || '', ''))}`,
-    foot: `${ed ? '<button class="btn-x danger fit" data-del aria-label="Eliminar"><i class="bi bi-trash3"></i></button>' : ''}<button class="btn-x" data-save>${ed ? 'Guardar' : 'Registrar servicio'}</button>`,
-    onMount: sh => {
-      bindDateChips(sh);
-      sh.$$('[data-mon]').forEach(b => b.onclick = () => { mon = b.dataset.mon; sh.$$('[data-mon]').forEach(x => x.classList.toggle('on', x === b)); setCurLabels(sh, 's-monto', mon); });
-      sh.$$('[data-prom]').forEach(b => b.onclick = () => { const n = Number(b.dataset.prom); sh.$('#s-est').value = n ? addDays(val(sh, 's-fecha') || h, n) : ''; });
-      if (!ed) setTimeout(() => sh.$('#s-cliente')?.focus(), 380);
-      sh.$('[data-save]').onclick = () => {
-        const cliente = val(sh, 's-cliente'), serv = val(sh, 's-serv'), monto = num(sh, 's-monto');
-        if (!cliente) { toast('¿Quién es el cliente?', 'danger'); return sh.$('#s-cliente').focus(); }
-        if (!serv) { toast('¿Qué servicio hiciste?', 'danger'); return sh.$('#s-serv').focus(); }
-        if (!(monto > 0)) { toast('Escribe el monto', 'danger'); return sh.$('#s-monto').focus(); }
-        const s = { id: ed?.id || uid('s_'), cliente, servicio: serv, monto, moneda: mon, fecha_servicio: val(sh, 's-fecha') || h, fecha_estimada: val(sh, 's-est'), estado: ed?.estado || 'pendiente', fecha_cobro: ed?.fecha_cobro || '', cuenta_id: ed?.cuenta_id || '', nota: val(sh, 's-nota'), creado: ed?.creado || nowISO() };
-        const ops = [up('Servicios', s)];
-        if (ed && ed.estado === 'cobrado') { const mv = S.data.movimientos.find(m => m.id === 'm1_' + ed.id); if (mv) ops.push(up('Movimientos', { id: mv.id, monto, nota: `${serv} · ${cliente}` })); }
-        sh.close(); commit(ops, ed ? 'Servicio actualizado' : 'Servicio registrado');
-      };
-      const d = sh.$('[data-del]'); if (d) d.onclick = () => { sh.close(); borrarServicio(ed.id); };
-    }
-  });
-}
-async function borrarServicio(id) {
-  const s = S.data.servicios.find(x => x.id === id); if (!s) return;
-  if (await confirmBox({ title: 'Eliminar servicio', msg: s.estado === 'cobrado' ? 'También se quitará el ingreso que se registró al cobrarlo.' : 'Se eliminará este servicio.', ok: 'Eliminar', danger: true }))
-    commit([del('Servicios', id), delWhere('Movimientos', 'ref_id', id)], 'Servicio eliminado');
-}
-function sheetCobrar(id) {
-  const s = S.data.servicios.find(x => x.id === id); if (!s) return;
-  const ctas = S.data.cuentas.filter(c => !isArch(c) && (c.moneda || 'PEN') === (s.moneda || 'PEN'));
-  if (!ctas.length) return toast(`Necesitas una cuenta en ${s.moneda === 'USD' ? 'dólares' : 'soles'} para registrar el cobro`, 'danger');
-  const pref = ctas.find(c => c.id === lastCuenta()) ? lastCuenta() : ctas[0].id;
-  openSheet({
-    title: 'Registrar cobro',
-    html: `<div style="text-align:center;margin:2px 0 16px">${avatar(s.cliente, 52)}<div class="fw8" style="margin-top:8px">${esc(s.cliente)}</div><div class="xs muted fw7">${esc(s.servicio)}</div><div class="big-num amt inc" style="margin-top:8px">${money(s.monto, s.moneda)}</div></div>
-    ${F.field('¿A qué cuenta entró?', F.cuentas('k-cuenta', pref, { cur: s.moneda || 'PEN' }))}${F.field('Fecha en que te pagó', F.date('k-fecha', hoy()))}
-    <div class="hint">Se sumará a tu cuenta y quedará como ingreso en “Servicios cobrados”.</div>`,
-    foot: '<button class="btn-x" data-save><i class="bi bi-check2-circle"></i> Marcar como cobrado</button>',
-    onMount: sh => {
-      bindDateChips(sh);
-      sh.$('[data-save]').onclick = () => {
-        const cuenta = val(sh, 'k-cuenta'), fecha = val(sh, 'k-fecha') || hoy();
-        const mv = { id: 'm1_' + id, fecha, tipo: 'ingreso', cuenta_id: cuenta, cuenta_destino_id: '', monto: s.monto, monto_destino: '', categoria_id: catBy('i_servicios') ? 'i_servicios' : (catDefault('ingreso')?.id || ''), nota: `${s.servicio} · ${s.cliente}`, ref_tipo: 'servicio', ref_id: id, creado: nowISO() };
-        localStorage.setItem('fin_lastcuenta', cuenta);
-        sh.close(); commit([up('Servicios', { id, estado: 'cobrado', fecha_cobro: fecha, cuenta_id: cuenta }), up('Movimientos', mv)], '¡Cobro registrado! 💸');
-      };
-    }
-  });
-}
-function sheetServDet(id) {
-  const s = S.data.servicios.find(x => x.id === id); if (!s) return;
-  const cob = s.estado === 'cobrado', dias = s.fecha_estimada ? diffDays(s.fecha_estimada, hoy()) : null;
-  openSheet({
-    title: esc(s.cliente),
-    html: `<div style="text-align:center;margin:2px 0 16px">${avatar(s.cliente, 56)}<div class="fw7" style="margin-top:8px">${esc(s.servicio)}</div><div class="big-num amt ${cob ? 'inc' : 'tr'}" style="margin-top:6px">${money(s.monto, s.moneda)}</div>
-      <div style="margin-top:8px">${cob ? `<span class="pill ok"><i class="bi bi-check2-circle"></i> Cobrado el ${fechaCorta(s.fecha_cobro)}</span>` : vencBadge(dias, false)}</div></div>
-      <div class="timeline"><div class="tl"><span class="ico sm" style="--c:var(--tr)"><i class="bi bi-briefcase"></i></span><div class="mid"><div class="t">Servicio realizado</div><div class="s">${fechaLarga(s.fecha_servicio)}</div></div></div>
-      ${s.fecha_estimada ? `<div class="tl"><span class="ico sm" style="--c:var(--loan)"><i class="bi bi-calendar-event"></i></span><div class="mid"><div class="t">Pago esperado</div><div class="s">${fechaLarga(s.fecha_estimada)}</div></div></div>` : ''}
-      ${cob ? `<div class="tl"><span class="ico sm" style="--c:var(--inc)"><i class="bi bi-cash-coin"></i></span><div class="mid"><div class="t">Cobrado</div><div class="s">${fechaLarga(s.fecha_cobro)} · ${esc(cuentaBy(s.cuenta_id)?.nombre || '—')}</div></div></div>` : ''}</div>
-      ${s.nota ? `<div class="hint" style="margin-top:12px">📝 ${esc(s.nota)}</div>` : ''}`,
-    foot: `<button class="btn-x danger fit" data-a="del" aria-label="Eliminar"><i class="bi bi-trash3"></i></button><button class="btn-x line" data-a="edit"><i class="bi bi-pencil"></i> Editar</button>${cob ? '<button class="btn-x soft" data-a="undo">Deshacer cobro</button>' : '<button class="btn-x" data-a="cobrar">Cobrar</button>'}`,
-    onMount: sh => {
-      sh.$('[data-a=edit]').onclick = () => { sh.close(); sheetServicio({ id }); };
-      sh.$('[data-a=del]').onclick = () => { sh.close(); borrarServicio(id); };
-      const c = sh.$('[data-a=cobrar]'); if (c) c.onclick = () => { sh.close(); sheetCobrar(id); };
-      const u = sh.$('[data-a=undo]'); if (u) u.onclick = async () => { if (await confirmBox({ title: 'Deshacer cobro', msg: 'Se quitará el ingreso y el servicio volverá a pendiente.', ok: 'Deshacer' })) { sh.close(); commit([up('Servicios', { id, estado: 'pendiente', fecha_cobro: '', cuenta_id: '' }), delWhere('Movimientos', 'ref_id', id)], 'Cobro deshecho'); } };
-    }
-  });
-}
-
-/* ===================== GRUPOS Y CATEGORÍAS ===================== */
-function sheetGrupo(opts = {}) {
-  const ed = opts.id ? grupoBy(opts.id) : null; let ico = ed?.icono || '🏦', tipo = ed?.tipo || 'normal';
-  openSheet({
-    title: ed ? 'Editar grupo' : 'Nuevo grupo',
-    html: `${F.field('Nombre', F.text('g-nombre', ed?.nombre || '', 'Ej. Ahorros de alto rendimiento'))}
-    ${F.field('Tipo', `<div class="seg"><button type="button" data-t="normal" class="${tipo === 'normal' ? 'on' : ''}">Normal</button><button type="button" data-t="ahorro" class="${tipo === 'ahorro' ? 'on' : ''}">Ahorro</button><button type="button" data-t="credito" class="${tipo === 'credito' ? 'on' : ''}">Crédito</button></div>`, 'Crédito = tarjetas (muestran “saldo a pagar”). Ahorro = suma en “Ahorros”.')}
-    ${F.field('Icono', `<div class="emoji-grid">${['🏦', '💵', '💳', '🐷', '👜', '🏠', '🚗', '🎓', '✈️', '📈', '💰', '🪙'].map(e => `<button type="button" data-e="${e}" class="${e === ico ? 'on' : ''}">${e}</button>`).join('')}</div>`)}`,
-    foot: `${ed ? '<button class="btn-x danger fit" data-del aria-label="Eliminar"><i class="bi bi-trash3"></i></button>' : ''}<button class="btn-x" data-save>Guardar</button>`,
-    onMount: sh => {
-      sh.$$('[data-t]').forEach(b => b.onclick = () => { tipo = b.dataset.t; sh.$$('[data-t]').forEach(x => x.classList.toggle('on', x === b)); });
-      sh.$$('[data-e]').forEach(b => b.onclick = () => { ico = b.dataset.e; sh.$$('[data-e]').forEach(x => x.classList.toggle('on', x === b)); });
-      sh.$('[data-save]').onclick = () => {
-        const nombre = val(sh, 'g-nombre'); if (!nombre) return toast('Ponle un nombre', 'danger');
-        sh.close(); commit([up('Grupos', { id: ed?.id || uid('g_'), nombre, icono: ico, tipo, orden: ed?.orden || S.data.grupos.length + 1 })], 'Grupo guardado');
-      };
-      const d = sh.$('[data-del]'); if (d) d.onclick = async () => {
-        if (S.data.cuentas.some(c => c.grupo_id === ed.id)) return toast('Mueve o elimina primero las cuentas de este grupo', 'danger');
-        if (await confirmBox({ title: 'Eliminar grupo', msg: 'Se eliminará este grupo vacío.', ok: 'Eliminar', danger: true })) { sh.close(); commit([del('Grupos', ed.id)], 'Grupo eliminado'); }
-      };
-    }
-  });
-}
-
-function sheetCategoria(opts = {}) {
-  const ed = opts.id ? catBy(opts.id) : null; let tipo = ed?.tipo || opts.tipo || S.setTab || 'gasto', ico = ed?.icono || '🏷️', color = ed?.color || PALETA[S.data.categorias.length % PALETA.length];
-  const sys = ed && SISTEMA.includes(ed.id);
-  openSheet({
-    title: ed ? 'Editar categoría' : 'Nueva categoría',
-    html: `${F.field('Nombre', F.text('k-nombre', ed?.nombre || '', 'Ej. Gimnasio'))}
-    ${ed ? '' : `<div class="seg" style="margin-bottom:16px"><button type="button" data-t="gasto" class="${tipo === 'gasto' ? 'on' : ''}">Gasto</button><button type="button" data-t="ingreso" class="${tipo === 'ingreso' ? 'on' : ''}">Ingreso</button></div>`}
-    ${F.field('Icono (elige o escribe un emoji)', `<div style="display:flex;gap:10px;align-items:center;margin-bottom:6px"><input id="k-ico" class="form-control" style="width:76px;text-align:center;font-size:1.4rem!important" value="${esc(ico)}" maxlength="4"></div><div class="emoji-grid">${EMOJIS.map(e => `<button type="button" data-e="${e}">${e}</button>`).join('')}</div>`)}
-    ${F.field('Color', `<div class="swatches">${PALETA.map(c => `<button type="button" data-c="${c}" class="${c === color ? 'on' : ''}" style="--c:${c}"></button>`).join('')}</div>`)}`,
-    foot: `${ed && !sys ? '<button class="btn-x danger fit" data-del aria-label="Eliminar"><i class="bi bi-trash3"></i></button>' : ''}<button class="btn-x" data-save>Guardar</button>`,
-    onMount: sh => {
-      sh.$$('[data-t]').forEach(b => b.onclick = () => { tipo = b.dataset.t; sh.$$('[data-t]').forEach(x => x.classList.toggle('on', x === b)); });
-      sh.$$('[data-e]').forEach(b => b.onclick = () => { ico = b.dataset.e; sh.$('#k-ico').value = ico; });
-      sh.$$('[data-c]').forEach(b => b.onclick = () => { color = b.dataset.c; sh.$$('[data-c]').forEach(x => x.classList.toggle('on', x === b)); });
-      if (!ed) setTimeout(() => sh.$('#k-nombre')?.focus(), 380);
-      sh.$('[data-save]').onclick = () => {
-        const nombre = val(sh, 'k-nombre'); if (!nombre) { toast('Ponle un nombre', 'danger'); return sh.$('#k-nombre').focus(); }
-        const c = { id: ed?.id || uid('cat_'), tipo, nombre, icono: val(sh, 'k-ico') || '🏷️', color, orden: ed?.orden || (catsTipo(tipo).length + 1) };
-        sh.close(); commit([up('Categorias', c)], 'Categoría guardada'); opts.onSaved && opts.onSaved(c.id);
-      };
-      const d = sh.$('[data-del]'); if (d) d.onclick = async () => {
-        const usos = S.data.movimientos.filter(m => m.categoria_id === ed.id);
-        const msg = usos.length ? `Tiene ${usos.length} movimiento${usos.length > 1 ? 's' : ''}; pasarán a “${esc(catDefault(ed.tipo)?.nombre || 'Otros')}”.` : 'Se eliminará esta categoría.';
-        if (await confirmBox({ title: 'Eliminar categoría', msg, ok: 'Eliminar', danger: true })) {
-          const dest = catDefault(ed.tipo)?.id || '';
-          sh.close(); commit([...usos.map(m => up('Movimientos', { id: m.id, categoria_id: dest })), del('Categorias', ed.id)], 'Categoría eliminada');
-        }
-      };
-    }
-  });
-}
-
-/* =====================================================================
-   MIS FINANZAS · arranque, navegación y acciones
-   ===================================================================== */
-const NAV = [['inicio', 'house-door', 'Inicio'], ['diario', 'journal-text', 'Diario'], ['cuentas', 'wallet2', 'Cuentas'], ['prestamos', 'people', 'Préstamos'], ['servicios', 'briefcase', 'Servicios']];
-const TITULOS = { inicio: 'Hola 👋', diario: 'Diario', cuentas: 'Cuentas', prestamos: 'Préstamos', servicios: 'Servicios', ajustes: 'Ajustes' };
-const VISTAS = { inicio: vInicio, diario: vDiario, cuentas: vCuentas, prestamos: vPrestamos, servicios: vServicios, ajustes: vAjustes };
-
-function renderChrome() {
-  $$('.nav-i').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
-  $('#title').textContent = TITULOS[S.view];
-  $('#subtitle').textContent = S.view === 'inicio' ? cap(fechaLarga(hoy()).replace(/ \d{4}$/, '')) : ({ diario: 'Tus ingresos y gastos', cuentas: 'Dónde está tu dinero', prestamos: 'Quién te debe y a quién debes', servicios: 'Lo que tienes por cobrar', ajustes: 'Personaliza tu app' }[S.view]);
-  $('#fab').hidden = S.view === 'ajustes';
-  $('#fab').setAttribute('aria-label', S.view === 'prestamos' ? 'Nuevo préstamo' : S.view === 'servicios' ? 'Nuevo servicio' : 'Nuevo movimiento');
-  document.body.classList.toggle('hide', localStorage.getItem('fin_hide') === '1');
-  const eye = $('#btn-hide i'); if (eye) eye.className = 'bi bi-eye' + (document.body.classList.contains('hide') ? '-slash' : '');
-}
-function renderAll() {
-  if (!S.cargado) return;
-  renderChrome();
-  $('#view').innerHTML = VISTAS[S.view]();
-  if (S.view === 'inicio') requestAnimationFrame(chartsInicio); else killCharts();
-}
-function setView(v) {
-  S.view = v; killCharts();
-  const el = $('#view'); el.classList.remove('view'); void el.offsetWidth; el.classList.add('view');
-  renderAll(); window.scrollTo({ top: 0 });
-}
-
-/* ---------- acciones ---------- */
-Object.assign(ACT, {
-  go: el => { if (el.dataset.t) S.prestTab = el.dataset.t; setView(el.dataset.v); },
-  nav: el => setView(el.dataset.v),
-  mes: el => { S.mes = addMonth(S.mes, Number(el.dataset.d)); renderAll(); },
-  mesHoy: () => { S.mes = ym(hoy()); renderAll(); },
-  filtro: el => { S.filtro = el.dataset.v; renderAll(); },
-  verCat: el => { S.cat = el.dataset.id; S.filtro = 'gasto'; S.q = ''; setView('diario'); },
-  clearCat: () => { S.cat = ''; renderAll(); },
-  cuentasTab: el => { S.cuentasTab = el.dataset.v; renderAll(); },
-  goRend: () => { S.cuentasTab = 'rend'; setView('cuentas'); },
-  prestTab: el => { S.prestTab = el.dataset.v; renderAll(); },
-  prestEstado: el => { S.prestEstado = el.dataset.v; renderAll(); },
-  servTab: el => { S.servTab = el.dataset.v; renderAll(); },
-  setTab: el => { S.setTab = el.dataset.v; renderAll(); },
-  tema: el => { localStorage.setItem('fin_theme', el.dataset.v); aplicarTema(); renderAll(); },
-  toggleGrupo: el => { S.collapsed[el.dataset.id] = !S.collapsed[el.dataset.id]; renderAll(); },
-  hide: () => { localStorage.setItem('fin_hide', document.body.classList.contains('hide') ? '0' : '1'); renderAll(); },
-  fab: () => { if (S.view === 'prestamos') sheetPrestamo(); else if (S.view === 'servicios') sheetServicio(); else sheetMov(); },
-  editMov: el => sheetMov({ id: el.dataset.id }),
-  newCuenta: el => sheetCuenta({ grupo: el.dataset.g }),
-  cuentaDet: el => sheetCuentaDet(el.dataset.id),
-  regInteres: el => sheetInteres(el.dataset.id),
-  newPrest: () => sheetPrestamo(),
-  prestDet: el => sheetPrestDet(el.dataset.id),
-  abonar: el => sheetAbono(el.dataset.id),
-  newServ: () => sheetServicio(),
-  servDet: el => sheetServDet(el.dataset.id),
-  cobrar: el => sheetCobrar(el.dataset.id),
-  newCat: () => sheetCategoria({ tipo: S.setTab }),
-  editCat: el => sheetCategoria({ id: el.dataset.id }),
-  newGrupo: () => sheetGrupo(),
-  editGrupo: el => sheetGrupo({ id: el.dataset.id }),
-  export: el => exportar(el.dataset.v),
-  refresh: async () => {
-    setSync('saving');
-    try { await cargar(); renderAll(); setSync('ok'); toast('Datos actualizados'); } catch (e) { setSync('error'); toast('No se pudo actualizar', 'danger'); }
-  },
-  logout: () => logout()
-});
-document.addEventListener('input', e => {
-  if (e.target.id === 'q') { S.q = e.target.value; const l = $('#mov-list'); if (l) l.innerHTML = listaMovs(); }
-});
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && S.cargado && !_pending && !sheetStack.length && Date.now() - S.lastLoad > 90000)
-    cargar().then(renderAll).catch(() => { });
-});
-
-/* ---------- sesión (usuario y contraseña) ---------- */
-let loginBusy = false;
-const storedTok = () => localStorage.getItem('fin_tok') || sessionStorage.getItem('fin_tok') || '';
-function lockMsg(t, ok = false) { const m = $('#lock-msg'); m.textContent = t; m.style.color = ok ? '#fff' : ''; }
-function setLoginBtn(busy) { const b = $('#l-go'); b.disabled = busy; b.textContent = busy ? 'Entrando…' : 'Entrar'; }
-function showLock(msg = '') { $('#lock').hidden = false; $('#app').hidden = true; lockMsg(msg); setLoginBtn(false); }
-function abrirApp() { $('#lock').hidden = true; $('#app').hidden = false; S.view = 'inicio'; setView('inicio'); }
-function limpiarSesion() { localStorage.removeItem('fin_tok'); sessionStorage.removeItem('fin_tok'); S.token = ''; }
-function logout() {
-  if (S.token) callApi('logout').catch(() => { });
-  limpiarSesion(); S.cargado = false; S.data = { grupos: [], cuentas: [], categorias: [], movimientos: [], prestamos: [], servicios: [] };
-  sheetStack.slice().forEach(s => s.close()); $('#l-clave').value = ''; showLock();
-}
-function errorLogin(e, auto) {
-  const r = e.res || {};
-  if (r.error === 'CREDENCIALES_INCORRECTAS') { const c = $('#lock-form'); c.classList.add('shake'); setTimeout(() => c.classList.remove('shake'), 500); $('#l-clave').value = ''; showLock(`Usuario o contraseña incorrectos${r.restantes != null ? ` · te quedan ${r.restantes} intentos` : ''}`); }
-  else if (r.error === 'BLOQUEADO') showLock('Demasiados intentos. Espera 15 minutos.');
-  else if (r.error === 'NO_AUTORIZADO') { limpiarSesion(); showLock(auto ? 'Tu sesión expiró. Vuelve a iniciar sesión.' : ''); }
-  else if (r.error === 'SIN_API_URL') showLock('Falta pegar la URL del Apps Script en API_URL (index.html).');
-  else showLock('No se pudo conectar. Revisa tu internet o la URL del Apps Script.');
-}
-async function login(usuario, clave, recordar) {
-  if (loginBusy) return; loginBusy = true; setLoginBtn(true); lockMsg('');
-  try {
-    const r = await callApi('login', { usuario, clave, recordar });
-    if (!r || !r.ok) { const e = new Error((r && r.error) || 'ERROR'); e.res = r; throw e; }
-    S.token = r.token; await cargar();
-    (recordar ? localStorage : sessionStorage).setItem('fin_tok', S.token); (recordar ? sessionStorage : localStorage).removeItem('fin_tok');
-    localStorage.setItem('fin_user', usuario); $('#l-clave').value = ''; abrirApp();
-  } catch (e) { S.token = ''; errorLogin(e, false); }
-  loginBusy = false; setLoginBtn(false);
-}
-function initLock() {
-  $('#l-user').value = localStorage.getItem('fin_user') || '';
-  $('#lock-form').addEventListener('submit', e => {
-    e.preventDefault(); const u = $('#l-user').value.trim(), c = $('#l-clave').value;
-    if (!u || !c) return lockMsg('Escribe tu usuario y contraseña');
-    login(u, c, $('#remember').checked);
-  });
-  $('#l-eye').addEventListener('click', () => {
-    const i = $('#l-clave'), show = i.type === 'password'; i.type = show ? 'text' : 'password';
-    $('#l-eye i').className = 'bi bi-eye' + (show ? '-slash' : '');
-  });
-}
-
-/* ---------- arranque ---------- */
-function boot() {
-  aplicarTema(); matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { aplicarTema(); renderAll(); });
-  $('#dock-items').innerHTML = NAV.map(([v, i, t]) => `<button class="nav-i" data-v="${v}" data-act="nav"><i class="bi bi-${i}"></i><span>${t}</span></button>`).join('')
-    + `<button class="nav-i side-extra" data-v="ajustes" data-act="nav"><i class="bi bi-gear"></i><span>Ajustes</span></button>`;
-  initLock();
-  const t = storedTok();
-  if (t) {
-    S.token = t; $('#lock').hidden = false; lockMsg('Entrando…', true); setLoginBtn(true);
-    cargar().then(abrirApp).catch(e => { S.token = ''; errorLogin(e, true); });
-  } else showLock();
-}
-boot();
-
-
-</script>
-</body>
-</html>
+      sh.$('[data-save]').
